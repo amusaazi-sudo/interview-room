@@ -13,11 +13,6 @@ Built for Turing College (Sprint 1: prompt engineering, LLM settings and securit
 - **Four layers of security** against prompt injection, including an LLM guard that fails closed
 - **Clean structure:** each file has one job and stays under about 130 lines, with tests that run without calling the API
 
-## Screenshots
-
-| Mock interview | Question generator | STAR coach |
-|---|---|---|
-| ![Mock interview](docs/screenshots/mock-interview.png) | ![Question generator](docs/screenshots/question-generator.png) | ![STAR coach](docs/screenshots/star-coach.png) |
 
 ## What it does
 
