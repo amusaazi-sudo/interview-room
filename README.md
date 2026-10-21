@@ -1,15 +1,31 @@
 # 🎤 Interview Room
 
-An AI interview practice app built with **Streamlit** and the **OpenRouter API** (GPT-5 models).
-Turing College, Sprint 1 project: prompt engineering, LLM settings and security guards.
+An AI interview practice app: run a mock interview, generate likely questions for a job, or get your answers scored with the STAR method. Built with **Streamlit** and the **OpenRouter API** (GPT-5 models).
+
+**Why:** practising interviews is hard without someone to ask questions and give honest feedback. Interview Room plays that role, and can tailor everything to a real job advert.
+
+Built for Turing College (Sprint 1: prompt engineering, LLM settings and security).
+
+## Highlights
+
+- **A real chatbot:** the mock interview remembers the conversation, asks one question at a time, and scores each answer
+- **Prompt engineering, measured:** 5 prompt techniques compared on the same input, with token counts and timings, across 3 rounds of fixes
+- **Four layers of security** against prompt injection, including an LLM guard that fails closed
+- **Clean structure:** each file has one job and stays under about 130 lines, with tests that run without calling the API
+
+## Screenshots
+
+| Mock interview | Question generator | STAR coach |
+|---|---|---|
+| ![Mock interview](docs/screenshots/mock-interview.png) | ![Question generator](docs/screenshots/question-generator.png) | ![STAR coach](docs/screenshots/star-coach.png) |
 
 ## What it does
 
 | Mode | What the user does | What the AI does |
 |---|---|---|
-| 🎤 **Mock interview** | Picks a job, seniority, interviewer style, difficulty and number of questions, then answers in a chat | Asks one question at a time, gives feedback and a score after each answer, and ends with a summary |
-| 📝 **Question generator** | Enters a job title and seniority | Returns 8 likely interview questions, using one of 5 prompt techniques |
-| ⭐ **STAR coach** | Answers a behavioural question (given by the app, or their own) | Scores the Situation, Task, Action and Result out of 10 and writes an improved version |
+| 🎤 **Mock interview** | Picks a job title from a list, seniority, interviewer style, difficulty and number of questions, then answers in a chat | Asks one question at a time, gives feedback and a score after each answer, and ends with a summary |
+| 📝 **Question generator** | Picks a job title and seniority, then chooses **Generate questions** or **Generate as JSON** | Returns 8 likely interview questions. The JSON version shows cards and can be downloaded as a `.json` file |
+| ⭐ **STAR coach** | Picks a job title and seniority, then answers a behavioural question (built-in, written by the AI for that role, or their own) | Scores the Situation, Task, Action and Result out of 10 and writes an improved version, tailored to the role and level |
 
 Both the mock interview and the question generator accept an optional **job description**, so the
 questions are tailored to a real job advert.
@@ -34,10 +50,10 @@ Run the app:
 streamlit run app.py
 ```
 
-Run the tests (no API calls, no cost):
+Run the tests (12 tests, no API calls, no cost):
 
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Project structure
@@ -46,7 +62,7 @@ Each file has one job, so no file is longer than about 130 lines.
 
 ```
 app.py                    Entry point: page setup and choosing a mode
-config.py                 Models, limits and settings in one place
+config.py                 Models, limits, settings and the job title list in one place
 
 core/
   llm.py                  Talks to OpenRouter (chat_llm, ask_llm)
@@ -63,6 +79,8 @@ ui/                       One file per screen, plus shared helpers
   mock_interview.py       Mode 1
   question_generator.py   Mode 2
   star_coach.py           Mode 3
+  star_feedback.py        Mode 3 results: scores, feedback, improved answer
+  job_title.py            Shared job title dropdown
   job_description.py      Shared job description box
   components.py           Rate limit, debug panel, JSON helpers
   state.py, context.py    Session memory and settings bundle
@@ -116,19 +134,19 @@ Four layers of defence, so if one misses an attack the next can catch it:
 4. **Hardened prompts:** user text wrapped in `<user_input>` / `<job_description>` tags, plus rules to
    treat it as data, never reveal instructions, and stay on topic
 
-Plus a **rate limit** (30 requests per session) and **trusted vs untrusted input**: the STAR coach's
-built-in questions skip the LLM check; anything the user types does not.
+Plus a **rate limit** (30 requests per session) and **trusted vs untrusted input**: job titles come
+from a dropdown and the STAR coach's built-in and role-based questions are written by the app, so they
+skip the LLM check; anything the user types (answers, their own questions, job descriptions) does not.
 
 Results: `docs/security_tests.md` and `docs/jailbreak_tests.xlsx`.
 
-## Optional tasks completed
+## Changes after code review
 
-- **Hard:** full chatbot (mock interview with conversation memory)
-- **Medium:** all model settings as sliders/fields · choice of models · developer settings separate
-  from the user experience · two JSON output formats · job description field · jailbreak tests in Excel
-- **Easy:** interviewer personas (friendly/neutral/strict) · difficulty levels · tuned and compared
-  settings · concise vs detailed (verbosity) · structured evaluation criteria (STAR rubric) ·
-  stricter input validation (with an LLM check)
+My reviewer suggested three improvements, all now in place:
+
+1. **Job title is a dropdown, not free text.** Before, a user could type anything ("asdf", a joke, an attack), and the app had to spend an extra AI request checking it. Now the model only ever receives a real job title, and that check is no longer needed.
+2. **A dedicated "Generate as JSON" button.** Structured output no longer needs the developer settings. The cards can also be downloaded as a `.json` file.
+3. **STAR coach knows the role.** Job title and seniority are set at the top, the feedback and improved answer are tailored to them, and a new button writes a behavioural question for that role.
 
 ## Known limitations
 
@@ -161,4 +179,13 @@ Results: `docs/security_tests.md` and `docs/jailbreak_tests.xlsx`.
 | `docs/settings_findings.md` | Effect of model, reasoning effort, verbosity, max tokens, temperature |
 | `docs/security_tests.md` | The 8 guard tests and what each layer caught |
 | `docs/jailbreak_tests.xlsx` | All jailbreak attempts, with a summary sheet |
-| `docs/chatbot_findings.md` | How the chatbot works and the bugs found and fixed 
+| `docs/chatbot_findings.md` | How the chatbot works and the bugs found and fixed |
+
+## Course tasks completed
+
+- **Hard:** full chatbot (mock interview with conversation memory)
+- **Medium:** all model settings as sliders/fields · choice of models · developer settings separate
+  from the user experience · two JSON output formats · job description field · jailbreak tests in Excel
+- **Easy:** interviewer personas (friendly/neutral/strict) · difficulty levels · tuned and compared
+  settings · concise vs detailed (verbosity) · structured evaluation criteria (STAR rubric) ·
+  stricter input validation (with an LLM check)

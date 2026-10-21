@@ -19,3 +19,32 @@ MAX_ANSWER_LENGTH = 2000    # a candidate's answer
 MAX_JOB_DESCRIPTION_LENGTH = 4000  # a pasted job advert (optional field)
 
 SENIORITY_LEVELS = ["Intern", "Junior", "Mid-level", "Senior"]
+
+# Job titles offered in a dropdown, so the model only ever receives a real job.
+# Because they come from this list, they are trusted input and skip the LLM safety check.
+JOB_TITLES = [
+    "Software Developer",
+    "Python Developer",
+    "Frontend Developer",
+    "Backend Developer",
+    "Full Stack Developer",
+    "Mobile App Developer",
+    "Data Analyst",
+    "Data Scientist",
+    "Machine Learning Engineer",
+    "AI Engineer",
+    "DevOps Engineer",
+    "QA / Test Engineer",
+    "Cybersecurity Analyst",
+    "IT Support Specialist",
+    "UX/UI Designer",
+    "Product Manager",
+    "Project Manager",
+    "Business Analyst",
+    "Customer Support Representative",
+    "Sales Representative",
+    "Marketing Specialist",
+    "Accountant",
+    "Nurse",
+    "Teacher",
+]

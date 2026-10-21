@@ -1,6 +1,8 @@
 """Tests for prompt building (no API calls). Run with:  pytest"""
 from prompts.interviewer import build_api_messages, build_interviewer_prompt
+from config import JOB_TITLES
 from prompts.question_generator import build_generator_prompts
+from prompts.star_coach import build_star_question_prompt, build_star_user_prompt
 
 JD = "We need a Junior Python Developer with Django and PostgreSQL."
 
@@ -31,3 +33,19 @@ def test_kickoff_is_not_wrapped_but_answers_are():
     messages = build_api_messages("system", history)
     assert messages[1]["content"] == "kickoff"
     assert messages[3]["content"] == "<user_input>my answer</user_input>"
+
+
+def test_job_title_list_has_no_duplicates():
+    assert len(JOB_TITLES) == len(set(JOB_TITLES))
+
+
+def test_star_feedback_prompt_includes_the_role_outside_the_user_tags():
+    prompt = build_star_user_prompt("Tell me about a team.", "I led...", "Data Analyst", "Junior")
+    role_line, rest = prompt.split("<user_input>", 1)
+    assert "Junior Data Analyst" in role_line
+    assert "I led..." in rest
+
+
+def test_star_question_prompt_uses_role_and_level():
+    prompt = build_star_question_prompt("Nurse", "Senior")
+    assert "Nurse" in prompt and "Senior" in prompt

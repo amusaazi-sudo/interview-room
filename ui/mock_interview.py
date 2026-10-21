@@ -1,8 +1,8 @@
 """Mode 1: mock interview chatbot (hard task)."""
 import streamlit as st
 
-from config import MAX_FIELD_LENGTH, SENIORITY_LEVELS
-from core.guards import validate_answer, validate_input
+from config import SENIORITY_LEVELS
+from core.guards import validate_answer
 from core.llm import chat_llm
 from prompts.interviewer import (
     DIFFICULTY, INTERVIEW_END_MARKER, KICKOFF_MESSAGE, PERSONAS,
@@ -10,6 +10,7 @@ from prompts.interviewer import (
 )
 from ui.components import check_rate_limit, show_debug, show_request_count
 from ui.job_description import job_description_input, validate_job_description
+from ui.job_title import job_title_input
 from ui.state import reset_interview
 
 
@@ -36,8 +37,7 @@ def _get_interviewer_reply(ctx):
 
 def _render_setup(ctx):
     st.subheader("Set up your mock interview")
-    job_title = st.text_input("Job title", placeholder="e.g. Software Developer",
-                              max_chars=MAX_FIELD_LENGTH, key="int_job_title")
+    job_title = job_title_input(key="int_job_title")
     col1, col2 = st.columns(2)
     with col1:
         seniority = st.selectbox("Seniority level", SENIORITY_LEVELS, key="int_seniority")
@@ -52,10 +52,9 @@ def _render_setup(ctx):
         return
 
     check_rate_limit()
+    # The job title comes from our own list, so only the optional job description needs checking.
     with st.spinner("Checking your input..."):
-        ok, message = validate_input(job_title, "job title")
-        if ok:
-            ok, message = validate_job_description(job_description)
+        ok, message = validate_job_description(job_description)
     if not ok:
         st.warning(message)
         return

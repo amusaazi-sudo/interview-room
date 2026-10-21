@@ -3,19 +3,42 @@ import random
 
 import streamlit as st
 
-from config import MAX_ANSWER_LENGTH, MAX_QUESTION_LENGTH
+from config import MAX_ANSWER_LENGTH, MAX_QUESTION_LENGTH, SENIORITY_LEVELS
 from core.guards import validate_answer, validate_input
 from core.llm import ask_llm
 from prompts.star_coach import (
-    BEHAVIOURAL_QUESTIONS, STAR_COACH_PROMPT, STAR_PARTS, build_star_user_prompt,
+    BEHAVIOURAL_QUESTIONS, STAR_COACH_PROMPT, STAR_QUESTION_PROMPT,
+    build_star_question_prompt, build_star_user_prompt,
 )
 from ui.components import (
     check_rate_limit, parse_json, show_debug, show_raw_fallback, show_request_count,
 )
+from ui.job_title import job_title_input
+from ui.star_feedback import show_star_feedback
 
 
-def _choose_question():
-    """Returns (question, is_trusted). Built-in questions skip the safety check."""
+def _role_question(ctx, job_title, seniority):
+    """Ask the model for one behavioural question that fits the chosen role. Returns it, or None."""
+    check_rate_limit()
+    st.session_state.request_count += 1
+    with st.spinner(f"Writing a question for a {seniority} {job_title}..."):
+        try:
+            user_prompt = build_star_question_prompt(job_title, seniority)
+            reply, usage = ask_llm(STAR_QUESTION_PROMPT, user_prompt, json_mode=False,
+                                   **ctx.settings)
+            st.session_state.last_usage = usage
+        except Exception as e:
+            st.error(f"Something went wrong: {e}")
+            return None
+    question = reply.strip().strip('"').strip()
+    return question or None
+
+
+def _choose_question(ctx, job_title, seniority):
+    """Returns (question, is_trusted).
+
+    Built-in and app-generated questions skip the safety check; typed ones don't.
+    """
     ss = st.session_state
     source = st.radio("Question", ["Give me a question", "I'll write my own"],
                       horizontal=True, key="star_source")
@@ -31,9 +54,17 @@ def _choose_question():
     # Keep the same question across reruns until the user asks for a new one
     if "star_random_question" not in ss:
         ss.star_random_question = random.choice(BEHAVIOURAL_QUESTIONS)
-    if st.button("🎲 Give me a different question"):
-        others = [q for q in BEHAVIOURAL_QUESTIONS if q != ss.star_random_question]
-        ss.star_random_question = random.choice(others)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🎲 Give me a different question"):
+            others = [q for q in BEHAVIOURAL_QUESTIONS if q != ss.star_random_question]
+            ss.star_random_question = random.choice(others)
+    with col2:
+        if st.button("✨ Question for this role", help="Uses one AI request to write a question "
+                                                     "that fits the job title and level above."):
+            question = _role_question(ctx, job_title, seniority)
+            if question:
+                ss.star_random_question = question
     st.info(f"**Interview question:** {ss.star_random_question}")
     return ss.star_random_question, True
 
@@ -50,41 +81,19 @@ def _validate(question, question_is_trusted, answer):
     return None if ok else message
 
 
-def _show_star_feedback(data):
-    """JSON format 2: display a STAR evaluation with scores and a rewrite."""
-    st.metric("Overall score", f"{data.get('overall_score', 0)}/10")
-
-    for col, part in zip(st.columns(4), STAR_PARTS):
-        score = data.get(part, {}).get("score", 0)
-        with col:
-            st.metric(part.title(), f"{score}/10")
-            st.progress(min(max(score, 0), 10) / 10)
-
-    st.markdown("#### Feedback on each part")
-    for part in STAR_PARTS:
-        st.markdown(f"**{part.title()}:** {data.get(part, {}).get('feedback', '')}")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("#### ✅ Strengths")
-        for item in data.get("strengths", []):
-            st.markdown(f"- {item}")
-    with col2:
-        st.markdown("#### 🔧 To improve")
-        for item in data.get("improvements", []):
-            st.markdown(f"- {item}")
-
-    st.markdown("#### ✨ Improved answer")
-    st.caption("Replace anything in [brackets] with your own real details.")
-    st.info(data.get("improved_answer", ""))
-
-
 def render_star_coach(ctx):
     st.subheader("Improve a behavioural answer with the STAR method")
     st.caption("STAR = **S**ituation, **T**ask, **A**ction, **R**esult. "
-               "Answer a question and get a score for each part plus an improved version.")
+               "Answer a question and get a score for each part plus an improved version, "
+               "tailored to the job you're applying for.")
 
-    question, question_is_trusted = _choose_question()
+    col1, col2 = st.columns(2)
+    with col1:
+        job_title = job_title_input(key="star_job_title")
+    with col2:
+        seniority = st.selectbox("Seniority level", SENIORITY_LEVELS, key="star_seniority")
+
+    question, question_is_trusted = _choose_question(ctx, job_title, seniority)
     answer = st.text_area(
         "Your answer",
         placeholder="Write your answer the way you would say it in the interview...",
@@ -103,7 +112,7 @@ def render_star_coach(ctx):
         return
 
     st.session_state.request_count += 1
-    user_prompt = build_star_user_prompt(question, answer)
+    user_prompt = build_star_user_prompt(question, answer, job_title, seniority)
     with st.spinner("Your coach is reviewing your answer..."):
         try:
             reply, usage = ask_llm(STAR_COACH_PROMPT, user_prompt, json_mode=True,
@@ -120,7 +129,7 @@ def render_star_coach(ctx):
         st.warning("That doesn't look like an answer to an interview question. "
                    "Please write a genuine answer.")
     else:
-        _show_star_feedback(data)
+        show_star_feedback(data)
 
     show_request_count()
     show_debug(ctx, STAR_COACH_PROMPT, {"User prompt": user_prompt, "Raw JSON reply": reply})
